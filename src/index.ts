@@ -5,6 +5,7 @@ import {
 import { IFileBrowserFactory } from '@jupyterlab/filebrowser';
 import { IDefaultFileBrowser } from '@jupyterlab/filebrowser';
 import { Dialog, showDialog } from '@jupyterlab/apputils';
+import { ServerConnection } from '@jupyterlab/services';
 import { PublishDialog } from './publishDialog';
 import { MainAreaPreviewWidget } from './preview';
 import { TemplateListWidget, ISelectedTemplate } from './templateList';
@@ -68,6 +69,10 @@ const extension: JupyterFrontEndPlugin<void> = {
       caption: 'import notebook',
       execute: args => {
         const path = String(args.path);
+        let newNotebookName = path.split('/').pop();
+        const settings = ServerConnection.makeSettings();
+        let untitledNotebookFilename = '';
+
         requestAPI<any>('content', {
           method: 'PUT',
           body: JSON.stringify({ path })
@@ -76,14 +81,69 @@ const extension: JupyterFrontEndPlugin<void> = {
           return new Promise(resolve => {
             app.commands
               .execute('docmanager:new-untitled', {
+                // -- create new blank notebook
                 path: browserPath,
                 type: 'notebook'
               })
-              .then(model => {
+              .then(async model => {
+                // -- open new tab
+                return app.commands.execute('launcher:create', {}).then(() => {
+                  return model;
+                });
+              })
+              .then(async model => {
+                // -- generate filename for the Untitled notebook that is about to be renamed
+                untitledNotebookFilename = model.path;
+                const namesOfAllNotebooks: string[] = [];
+                const requestUrl = `${settings.baseUrl}api/contents`;
+                const requestOptions: RequestInit = { method: 'GET' };
+                // list all files in workspace
+                const response = await ServerConnection.makeRequest(
+                  requestUrl,
+                  requestOptions,
+                  settings
+                );
+                const responseData = JSON.parse(await response.text());
+                responseData.content.forEach((item: any) => {
+                  if (item.type === 'notebook') {
+                    namesOfAllNotebooks.push(item.name);
+                  }
+                });
+                // calculate what the name of the next notebook will need to be based on existing notebooks
+                const baseName = newNotebookName.split('.')[0];
+                let counter = 1;
+                let candidateName = newNotebookName;
+                // find unique name for new notebook
+                while (namesOfAllNotebooks.includes(candidateName)) {
+                  const suffix = baseName.match(/_\d+$/) ? '' : '_';
+                  candidateName = `${baseName.replace(/_\d+$/, '')}${suffix}${counter}.ipynb`;
+                  counter++;
+                }
+                newNotebookName = candidateName;
+                return model;
+              })
+              .then(async model => {
+                // -- rename the notebook
+                const requestUrl = `${settings.baseUrl}api/contents/${untitledNotebookFilename}`;
+                const requestOptions: RequestInit = {
+                  method: 'PATCH',
+                  body: JSON.stringify({
+                    path: `${newNotebookName}`
+                  })
+                };
+                await ServerConnection.makeRequest(
+                  requestUrl,
+                  requestOptions,
+                  settings
+                );
+                return model;
+              })
+              .then(() => {
+                // -- open the new notebook
                 mainAreaWidget.close();
                 return app.commands.execute('docmanager:open', {
                   factory: 'Notebook',
-                  path: model.path
+                  path: newNotebookName
                 });
               })
               .then(widget => {
@@ -93,6 +153,7 @@ const extension: JupyterFrontEndPlugin<void> = {
                 });
               })
               .then(() => {
+                // -- save the notebook to disk
                 return app.commands.execute('docmanager:save');
               });
           });

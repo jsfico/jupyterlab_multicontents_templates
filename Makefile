@@ -20,9 +20,9 @@ build: venv
 	venv/bin/jupyter lab build
 
 build-local:
-	jlpm run build
-	pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org --force-reinstall -r requirements.txt
-	python setup.py bdist_wheel
+	venv/bin/jlpm run build
+	venv/bin/pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org --force-reinstall -r requirements.txt
+	venv/bin/python setup.py bdist_wheel
 
 clean:
 	venv/bin/jlpm run clean:all || echo 'not cleaning jlpm'
