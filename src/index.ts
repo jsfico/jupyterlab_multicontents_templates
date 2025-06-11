@@ -13,6 +13,32 @@ import { requestAPI } from './handler';
 import { ShareDialog } from './shareDialog';
 
 /**
+ *
+ */
+function singularizeAndLowercaseTemplateDirectoryName(text: string): string {
+  const firstUnderscoreIndex = text.indexOf('_');
+  if (firstUnderscoreIndex === -1) {
+    return text.toLowerCase();
+  }
+
+  let prefix = text.slice(0, firstUnderscoreIndex);
+  const rest = text.slice(firstUnderscoreIndex);
+  prefix = prefix.toLowerCase();
+
+  // replace 'ies' with 'y'. utilities -> utility
+  if (prefix.endsWith('ies')) {
+    prefix = prefix.slice(0, -3) + 'y';
+  }
+
+  // singularize
+  if (prefix.endsWith('s')) {
+    prefix = prefix.slice(0, -1);
+  }
+
+  return prefix + rest;
+}
+
+/**
  * Initialization data for the jupyterlab_multicontents_templates extension.
  */
 const extension: JupyterFrontEndPlugin<void> = {
@@ -69,9 +95,11 @@ const extension: JupyterFrontEndPlugin<void> = {
       caption: 'import notebook',
       execute: args => {
         const path = String(args.path);
-        let newNotebookName = path.split('/').pop();
         const settings = ServerConnection.makeSettings();
         let untitledNotebookFilename = '';
+        let newNotebookName = singularizeAndLowercaseTemplateDirectoryName(
+          path.replace('/', '_')
+        );
 
         requestAPI<any>('content', {
           method: 'PUT',
@@ -84,12 +112,6 @@ const extension: JupyterFrontEndPlugin<void> = {
                 // -- create new blank notebook
                 path: browserPath,
                 type: 'notebook'
-              })
-              .then(async model => {
-                // -- open new tab
-                return app.commands.execute('launcher:create', {}).then(() => {
-                  return model;
-                });
               })
               .then(async model => {
                 // -- generate filename for the Untitled notebook that is about to be renamed
