@@ -12,7 +12,6 @@ import { TemplateListWidget, ISelectedTemplate } from './templateList';
 import { requestAPI } from './handler';
 import { ShareDialog } from './shareDialog';
 
-
 /**
  *
  */
@@ -38,7 +37,6 @@ function singularizeAndLowercaseTemplateDirectoryName(text: string): string {
 
   return prefix + rest;
 }
-
 
 /**
  * Initialization data for the jupyterlab_multicontents_templates extension.
