@@ -141,7 +141,14 @@ const extension: JupyterFrontEndPlugin<void> = {
                   candidateName = `${baseName.replace(/_\d+$/, '')}${suffix}${counter}.ipynb`;
                   counter++;
                 }
-                newNotebookName = candidateName;
+
+                if (browserPath.length > 0) {
+                  // include subfolder path if not in the root jupyterlab directory
+                  newNotebookName = `${browserPath}/${candidateName}`;
+                } else {
+                  newNotebookName = candidateName;
+                }
+
                 return model;
               })
               .then(async model => {
